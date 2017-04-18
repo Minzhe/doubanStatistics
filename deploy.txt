@@ -1,0 +1,7 @@
+---------------------   database configuration   ---------------------
+
+create a database called  “doubanStatistics”.
+The “doubanStatistics.sql.txt” file is for importing
+the “drugCombinationRemoteR” table into mysql.
+
+-----------------------------------------------------------------------

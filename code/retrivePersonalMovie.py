@@ -1,14 +1,15 @@
+###################################################
+###        retrivePersonalMovieHistory.py       ###
+###################################################
+# This script is to retrieve personal movie watching history information from movie.douban.com.
+
+
 from urllib.request import urlopen
 from urllib.error import HTTPError
 from bs4 import BeautifulSoup
 import time
 import csv
 
-
-
-'''
-This script is to retrieve personal movie watching history information from movie.douban.com.
-'''
 
 def concatUrl(userID, startNum):
     url = 'https://movie.douban.com/people/{}/collect?start={}&sort=time&rating=all&filter=all&mode=grid'.format(str(userID), str(startNum))
