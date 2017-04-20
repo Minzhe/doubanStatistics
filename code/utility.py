@@ -6,17 +6,18 @@
 import os
 import sys
 from urllib.request import urlretrieve
+from urllib.request import URLError
 from configparser import ConfigParser
 
-###############      working with directory      ###############
+###############     1. working with directory      ###############
 def getProjectDir():
     '''
     get the top absolute dirname of the project
     :return: dirname
     '''
     file_path = os.path.realpath(__file__)
-    end_idx = file_path.find('/code/function/utility.py')
-    proj_dir = file_path[0:end_idx]
+    end_idx = file_path.find('doubanStatistics')
+    proj_dir = file_path[0:end_idx] + 'doubanStatistics'
     return proj_dir
 
 
@@ -32,8 +33,23 @@ def checkTempFolder():
     return temp_dir
 
 
-###############      working with api      ###############
-def parseAPIurl(url):
+###############     2. working with api      ###############
+def catAPIurl(category, id):
+    '''
+    Concatenate item api url from its category and id.
+    :param category: movie or book
+    :param id: item id
+    :return: url
+    '''
+    if category == 'movie':
+        return 'https://api.douban.com/v2/movie/subject/' + id
+    elif category == 'book':
+        return 'https://api.douban.com/v2/book/' + id
+    else:
+        raise ValueError('Cannot parse item url, currently only support movie and book.')
+
+
+def catAPItempfile(url):
     '''
     Parse api url, subtract identification information to name file for downloading.
     :param url: api url
@@ -60,16 +76,39 @@ def APIdownloadJson(url):
     :return: no return.
     '''
     temp_dir = checkTempFolder()
-    temp_filename = parseAPIurl(url)
+    temp_filename = catAPItempfile(url)
     target_path = os.path.join(temp_dir, temp_filename)
-    if os.path.exists(target_path):
-        print("Temp file already exist.")
+    if not os.path.exists(target_path):
+        try:
+            urlretrieve(url, target_path)
+        except URLError:
+            print('Fetching api url failed, check internet connection.', sys.exc_info())
+
+def parseAPImovie(file):
+    '''
+    Parse api movie information and return from json file.
+    :param file: api temp json file
+    :return: movie attribute dict
+    '''
+
+
+
+###############     3. working with html      ###############
+def catHTML(category, id):
+    '''
+    Concatenate item url from its category and id.
+    :param category: movie or book
+    :param id: item id
+    :return: url
+    '''
+    if category in ['movie', 'book']:
+        return 'https://' + category + '.douban.com/subject/' + id
     else:
-        urlretrieve(url, target_path)
+        raise ValueError('Cannot parse item url, currently only support movie and book.')
 
 
 
-###############      connect to database      ###############
+###############     4. connect to database      ###############
 def parseDBconfig(config_file):
     '''
     Read database configuration information
@@ -92,9 +131,11 @@ def parseDBconfig(config_file):
         print('Parsing database configuration failed.\n', sys.exc_info())
 
 
+if __name__ == '__main__':
+    print(getProjectDir())
+    print(catAPItempfile('https://api.douban.com/v2/movie/subject/1764796'))
+    print(catAPItempfile('https://api.douban.com/v2/book/1003078'))
+    APIdownloadJson('https://api.douban.com/v2/movie/subject/1764796')
+    print(parseDBconfig('/home/minzhe/dbincloc/doubanStatistics.db'))
+    print(catHTML('movie', '1764796'))
 
-print(getProjectDir())
-parseAPIurl('https://api.douban.com/v2/movie/subject/1764796')
-parseAPIurl('https://api.douban.com/v2/book/1003078')
-APIdownloadJson('https://api.douban.com/v2/movie/subject/1764796')
-print(parseDBconfig('/home/minzhe/dbincloc/doubanStatistics.db'))
