@@ -5,9 +5,13 @@
 
 import os
 import sys
+from urllib.request import urlopen
 from urllib.request import urlretrieve
 from urllib.request import URLError
 from configparser import ConfigParser
+import json
+from bs4 import BeautifulSoup
+
 
 ###############     1. working with directory      ###############
 def getProjectDir():
@@ -42,9 +46,9 @@ def catAPIurl(category, id):
     :return: url
     '''
     if category == 'movie':
-        return 'https://api.douban.com/v2/movie/subject/' + id
+        return 'https://api.douban.com/v2/movie/subject/' + str(id)
     elif category == 'book':
-        return 'https://api.douban.com/v2/book/' + id
+        return 'https://api.douban.com/v2/book/' + str(id)
     else:
         raise ValueError('Cannot parse item url, currently only support movie and book.')
 
@@ -55,6 +59,7 @@ def catAPItempfile(url):
     :param url: api url
     :return: filename
     '''
+    url = url.strip('/')
     if '/movie/' in url:      # if movie
         start_idx = url.find('movie')
         name_list = ['api'] + url[start_idx:].split('/') + ['json']
@@ -78,18 +83,43 @@ def APIdownloadJson(url):
     temp_dir = checkTempFolder()
     temp_filename = catAPItempfile(url)
     target_path = os.path.join(temp_dir, temp_filename)
-    if not os.path.exists(target_path):
+    if os.path.exists(target_path):
+        return True
+    else:
         try:
             urlretrieve(url, target_path)
+            return True
         except URLError:
-            print('Fetching api url failed, check internet connection.', sys.exc_info())
+            print('Fetching {} failed, check internet connection.'.format(url), sys.exc_info())
+            return False
 
-def parseAPImovie(file):
+
+def parseJsonMovie(id):
     '''
     Parse api movie information and return from json file.
-    :param file: api temp json file
+    :param id: movie id
     :return: movie attribute dict
     '''
+    temp_dir = checkTempFolder()
+    temp_path = os.path.join(temp_dir, 'api.movie.subject.' + str(id) + '.json')
+    if os.path.exists(temp_path):
+        with open(temp_path, encoding='utf-8') as json_file:
+            data = json.load(json_file)
+            movie_info = dict()
+            movie_info['id'] = data['id']
+            movie_info['title'] = data['title']
+            movie_info['original_title'] = data['original_title']
+            movie_info['rating_ave'] = data['rating']['average']
+            movie_info['rating_count'] = data['ratings_count']
+            movie_info['wish_count'] = data['wish_count']
+            movie_info['viewed_count'] = data['collect_count']
+            movie_info['comment_count'] = data['comments_count']
+            movie_info['review_count'] = data['reviews_count']
+            movie_info['subtype'] = data['subtype']
+            movie_info['director'] = data['directors'][0]['id']
+            movie_info['year'] = data['year']
+            movie_info['country'] = data['countries']
+            return movie_info
 
 
 
@@ -107,6 +137,70 @@ def catHTML(category, id):
         raise ValueError('Cannot parse item url, currently only support movie and book.')
 
 
+def catHTMLtempfile(url):
+    '''
+    Parse html url, subtract identification information to name file for downloading.
+    :param url: api url
+    :return: filename
+    '''
+    url = url.strip('/')
+    if 'movie.douban.com/' in url:      # if movie
+        id = url.split('/')[-1]
+        temp_filename = 'movie.subject.' + id + '.html'
+        return temp_filename
+    elif 'book.douban.com/' in url:     # if book
+        id = url.split('/')[-1]
+        temp_filename = 'book.subject.' + id + '.html'
+        return temp_filename
+    else:
+        raise ValueError('Cannot parse html url, currently only support movie and book.')
+
+
+def downloadHTML(url):
+    '''
+    Download html file to temp folder
+    :param url:
+    :return: no return
+    '''
+    temp_dir = checkTempFolder()
+    temp_filename = catHTMLtempfile(url)
+    target_path = os.path.join(temp_dir, temp_filename)
+    if os.path.exists(target_path):
+        return True
+    else:
+        try:
+            urlretrieve(url, target_path)
+            return True
+        except URLError:
+            print('Fetching {} failed.'.format(url), sys.exc_info())
+            return False
+
+
+def parseHTML(id):
+    '''
+    Parse website movie information from html file and return .
+    :param id: movie id
+    :return: movie attribute dict
+    '''
+    temp_dir = checkTempFolder()
+    temp_path = os.path.join(temp_dir, 'movie.subject.' + str(id) + '.html')
+    if os.path.exists(temp_path):
+        with open(temp_path, encoding='utf-8') as html_file:
+            data = html_file.read()
+            bsObj = BeautifulSoup(data, 'lxml')
+            movie_info = dict()
+            # extract 5 stars rating distribution
+            i = 5
+            for rating in bsObj.findAll('span', {'class': 'rating_per'}):
+                rating_per = float(rating.get_text().strip('%'))/100
+                rating_per = float('{0:.3f}'.format(rating_per))
+                exec("movie_info['rating_{}'] = rating_per".format(i))
+                i -= 1
+            # extract pubdate
+            movie_info['pubdate'] = bsObj.find('span', {'class': 'comment-time'}).get_text().strip()
+            print(movie_info)
+
+
 
 ###############     4. connect to database      ###############
 def parseDBconfig(config_file):
@@ -118,7 +212,7 @@ def parseDBconfig(config_file):
     parser = ConfigParser()
     try:
         parser.read(config_file)
-        db_congif_dict = {}
+        db_congif_dict = dict()
         if parser.has_section('db_config'):
             db_congif_dict['host'] = parser.get('db_config', 'host')
             db_congif_dict['username'] = parser.get('db_config', 'username')
@@ -132,10 +226,17 @@ def parseDBconfig(config_file):
 
 
 if __name__ == '__main__':
-    print(getProjectDir())
-    print(catAPItempfile('https://api.douban.com/v2/movie/subject/1764796'))
-    print(catAPItempfile('https://api.douban.com/v2/book/1003078'))
-    APIdownloadJson('https://api.douban.com/v2/movie/subject/1764796')
-    print(parseDBconfig('/home/minzhe/dbincloc/doubanStatistics.db'))
-    print(catHTML('movie', '1764796'))
+    print('1.', getProjectDir())
+    url_1 = catAPIurl('movie', '1764796')
+    url_2 = catHTML('movie', '1764796')
+    print('2.', url_1, '\n', url_2)
+    tempfile_1 = catAPItempfile(url_1)
+    tempfile_2 = catHTMLtempfile(url_2)
+    print('3.', tempfile_1, '\n', tempfile_2)
+    print(APIdownloadJson('https://api.douban.com/v2/movie/subject/1764796'))
+    print(downloadHTML('https://movie.douban.com/subject/1764796/'))
+    print('5.', parseJsonMovie('1764796'))
+    print('6.', parseHTML('1764796'))
+    print('7.', parseDBconfig('/home/minzhe/dbincloc/doubanStatistics.db'))
+
 
