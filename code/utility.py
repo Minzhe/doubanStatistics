@@ -5,12 +5,13 @@
 
 import os
 import sys
-from urllib.request import urlopen
 from urllib.request import urlretrieve
 from urllib.request import URLError
 from configparser import ConfigParser
 import json
 from bs4 import BeautifulSoup
+import re
+
 
 
 ###############     1. working with directory      ###############
@@ -189,15 +190,104 @@ def parseHTML(id):
             data = html_file.read()
             bsObj = BeautifulSoup(data, 'lxml')
             movie_info = dict()
-            # extract 5 stars rating distribution
+
+            ### <h1>
+            # title
+            movie_info['title'] = bsObj.find('span', {'property': 'v:itemreviewed'}).get_text().split(' ')[0]
+            # original title
+            movie_info['original_title'] = bsObj.find('span', {'property': 'v:itemreviewed'}).get_text().split(' ')[1]
+            # year
+            year = bsObj.find('span', {'class': 'year'}).get_text().strip('(').strip(')')
+            try:
+                movie_info['year'] = int(year)
+            except ValueError:
+                print('Movie year format error!', sys.exc_info())
+
+            ### <div class="subject-others-interests-ft">
+            bsObj_others = bsObj.find('div', {'class': 'subject-others-interests-ft'})
+            ## tv
+            if '在看' in bsObj_others.findAll('a')[0].get_text():
+                movie_info['subtype'] = 'tv'
+                # viewed count
+                viewed_count = bsObj_others.find('a', text=re.compile('.*人看过')).get_text().strip('人看过')
+                print('***', viewed_count)
+                movie_info['viewed_count'] = int(viewed_count)
+                # wish_count
+                wish_count = bsObj_others.findAll('a')[2].get_text().strip('人想看')
+                movie_info['wish_count'] = int(wish_count)
+            ## movie
+            elif '看过' in bsObj_others.findAll('a')[0].get_text():
+                movie_info['subtype'] = 'movie'
+                # viewed count
+                viewed_count = bsObj_others.findAll('a')[0].get_text().strip('人看过')
+                movie_info['viewed_count'] = int(viewed_count)
+                # wish_count
+                wish_count = bsObj_others.findAll('a')[1].get_text().strip('人想看')
+                movie_info['wish_count'] = int(wish_count)
+            else:
+                raise ValueError('Cannot figure out item type (movie or tv), check original website of movie {}.'.format(id))
+
+
+            ### <div id="info">
+            bsObj_info = bsObj.find('div', {'id': 'info'})
+            # director
+            director = bsObj_info.find('a', {'rel': 'v:directedBy'})['href'].strip('/').split('/')[-1]
+            movie_info['director'] = int(director)
+            # country
+            movie_info['country'] = bsObj_info.find('spn', text=re.compile('.*国家.*')).next_sibling.strip()
+            # pubdate
+            pubdate = bsObj_info.find('span', {'property': 'v:initialReleaseDate'}).get_text()      # find the first
+            movie_info['pubdate'] = re.sub('\(.*\)', '', pubdate)
+            # duration
+            if movie_info['subtype'] == 'movie':
+                duration = bsObj_info.find('span', {'property': 'v:runtime'}).get_text().split(' ')[0]
+                movie_info['episode'] = None
+            elif movie_info['subtype'] == 'tv':
+                duration = bsObj_info.find(text=re.compile('.*单集片长.*')).next_sibling.strip()
+                episode = bsObj_info.find(text=re.compile('.*集数.*')).next_sibling.strip()
+                movie_info['episode'] = int(episode)
+            movie_info['duration'] = int(duration)
+
+
+            ### <div class="rating_self clearfix">
+            # rating_ave
+            rating_ave = bsObj.find('strong', {'class': 'll rating_num'}).get_text()
+            try:
+                movie_info['rating_ave'] = float(rating_ave)
+            except ValueError:
+                print('Movie rating average format error!', sys.exc_info())
+            # rating_count
+            rating_count = bsObj.find('span', {'property': 'v:votes'}).get_text()
+            try:
+                movie_info['rating_count'] = int(rating_count)
+            except ValueError:
+                print('Movie rating count format error!', sys.exc_info())
+
+            ### <div class="ratings-on-weight">
+            # rating_5-1
             i = 5
             for rating in bsObj.findAll('span', {'class': 'rating_per'}):
-                rating_per = float(rating.get_text().strip('%'))/100
-                rating_per = float('{0:.3f}'.format(rating_per))
+                rating_per = float('{0:.3f}'.format(float(rating.get_text().strip('%'))/100))
                 exec("movie_info['rating_{}'] = rating_per".format(i))
                 i -= 1
-            # extract pubdate
-            movie_info['pubdate'] = bsObj.find('span', {'class': 'comment-time'}).get_text().strip()
+
+            ### <div id="comments-section">
+            # comment_count
+            comment_count = bsObj.find('div', {'id': 'comments-section'}).h2.span.a.get_text().split(' ')[1]
+            try:
+                movie_info['comment_count'] = int(comment_count)
+            except ValueError:
+                print('Movie comment count format error!', sys.exc_info())
+
+            ### <section class="reviews mod movie-content">
+            # review_count
+            review_count = bsObj.find('section', {'class': 'reviews mod movie-content'}).header.h2.span.a.get_text().split(' ')[1]
+            try:
+                movie_info['review_count'] = int(review_count)
+            except ValueError:
+                print('Movie review count format error!', sys.exc_info())
+
+
             print(movie_info)
 
 
@@ -234,9 +324,11 @@ if __name__ == '__main__':
     tempfile_2 = catHTMLtempfile(url_2)
     print('3.', tempfile_1, '\n', tempfile_2)
     print(APIdownloadJson('https://api.douban.com/v2/movie/subject/1764796'))
-    print(downloadHTML('https://movie.douban.com/subject/1764796/'))
+    print('movie', downloadHTML('https://movie.douban.com/subject/1764796/'))
+    print('tv', downloadHTML('https://movie.douban.com/subject/10748120/'))
     print('5.', parseJsonMovie('1764796'))
-    print('6.', parseHTML('1764796'))
+    print('6.movie', parseHTML('1764796'))
+    print('6.tv', parseHTML('10748120'))
     print('7.', parseDBconfig('/home/minzhe/dbincloc/doubanStatistics.db'))
 
 

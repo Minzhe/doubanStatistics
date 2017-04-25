@@ -28,9 +28,7 @@ class Movie(object):
         self.__review_count = None
         self.__subtype = None
         self.__director = None
-        self.__writer = None
         self.__pubdate = None
-        self.__mainland_pubdate = None
         self.__year = None
         self.__duration = None
         self.__country = None
