@@ -31,6 +31,7 @@ class Movie(object):
         self.__pubdate = None
         self.__year = None
         self.__duration = None
+        self.__episode = None
         self.__country = None
 
 
@@ -79,7 +80,7 @@ class Movie(object):
             self.__year = movie_info['year']
             self.__country = movie_info['country']
 
-    def _readHTML(self):
+    def readHTML(self):
         '''
         Parse html file, and store information to movie instance
         :return: noreturn
@@ -87,6 +88,29 @@ class Movie(object):
         # download html file
         html_url = utility.catHTML('movie', self.__id)
         status = utility.downloadHTML(html_url)
+        # parse html file
+        if status:
+            movie_info = utility.parseHTML(self.__id)
+            self.__title = movie_info['title']
+            self.__original_title = movie_info['original_title']
+            self.__rating_ave = movie_info['rating_ave']
+            self.__rating_count = movie_info['rating_count']
+            self.__rating_5 = movie_info['rating_5']
+            self.__rating_4 = movie_info['rating_4']
+            self.__rating_3 = movie_info['rating_3']
+            self.__rating_2 = movie_info['rating_2']
+            self.__rating_1 = movie_info['rating_1']
+            self.__wish_count = movie_info['wish_count']
+            self.__viewed_count = movie_info['viewed_count']
+            self.__comment_count = movie_info['comment_count']
+            self.__review_count = movie_info['review_count']
+            self.__subtype = movie_info['subtype']
+            self.__director = movie_info['director']
+            self.__pubdate = movie_info['pubdate']
+            self.__year = movie_info['year']
+            self.__duration = movie_info['duration']
+            self.__episode = movie_info['episode']
+            self.__country = movie_info['country']
 
 
 
@@ -106,6 +130,16 @@ print('2.', robots_9.infoComplete(verbose=True))
 print('3.', robots_9.__getattribute__('_Movie__year'))
 print('4.', robots_9.__dict__)
 print('5.')
-robots_9.readAPI()
+robots_9.readHTML()
 print('6.', vars(robots_9))
 print(robots_9.infoComplete(verbose=True))
+
+detective = Movie(10748120)
+print('1.', detective.getid())
+print('2.', detective.infoComplete(verbose=True))
+print('3.', detective.__getattribute__('_Movie__year'))
+print('4.', detective.__dict__)
+print('5.')
+detective.readHTML()
+print('6.', vars(detective))
+print(detective.infoComplete(verbose=True))
