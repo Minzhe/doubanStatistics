@@ -7,10 +7,11 @@ import os
 import sys
 from urllib.request import urlretrieve
 from urllib.request import URLError
-from configparser import ConfigParser
 import json
 from bs4 import BeautifulSoup
 import re
+import time
+
 
 
 
@@ -193,15 +194,17 @@ def parseHTML(id):
 
             ### <h1>
             title = bsObj.find('span', {'property': 'v:itemreviewed'}).get_text().strip()
-            if 'Season' in title:
+            if 'Season' in title:           # tv
                 # title
                 movie_info['title'] = re.match('.+第.+季', title).group()
                 movie_info['original_title'] = title.replace(movie_info['title'], '').strip()
-            else:
+            else:                           # movie
                 # title
                 movie_info['title'] = title.split(' ')[0]
                 # original title
                 movie_info['original_title'] = ' '.join(title.split(' ')[1:])
+                if movie_info['original_title'] == '':  # if Chinese movie (no original name)
+                    movie_info['original_title'] = 'Null'
 
             # year
             year = bsObj.find('span', {'class': 'year'}).get_text().strip('(').strip(')')
@@ -243,7 +246,7 @@ def parseHTML(id):
             movie_info['pubdate'] = re.sub('\(.*\)', '', pubdate)
             # duration
             if movie_info['subtype'] == 'movie':
-                duration = bsObj_info.find('span', {'property': 'v:runtime'}).get_text().split(' ')[0]
+                duration = bsObj_info.find('span', {'property': 'v:runtime'}).get_text().split(' ')[0].strip('分钟')
                 movie_info['episode'] = -1
             elif movie_info['subtype'] == 'tv':
                 duration = bsObj_info.find('span', text=re.compile('.*单集片长.*')).next_sibling.strip().strip('分钟')
@@ -278,34 +281,17 @@ def parseHTML(id):
             review_count = bsObj.find('section', {'class': 'reviews mod movie-content'}).header.h2.span.a.get_text().split(' ')[1]
             movie_info['review_count'] = int(review_count)
 
-            if len(movie_info) == 20:
-                return movie_info
-            else:
-                raise KeyError('Incorrect number of keys of movie dict!')
+        # change date
+        temp_file_mtime = os.path.getmtime(temp_path)
+        movie_info['update_date'] = time.strftime('%Y-%m-%d', time.localtime(temp_file_mtime))
 
-
-
-###############     4. connect to database      ###############
-def parseDBconfig(config_file):
-    '''
-    Read database configuration information
-    :param config_file: configuration file path
-    :return: list of host, user, password, db information
-    '''
-    parser = ConfigParser()
-    try:
-        parser.read(config_file)
-        db_congif_dict = dict()
-        if parser.has_section('db_config'):
-            db_congif_dict['host'] = parser.get('db_config', 'host')
-            db_congif_dict['username'] = parser.get('db_config', 'username')
-            db_congif_dict['passwd'] = parser.get('db_config', 'password')
-            db_congif_dict['db'] = parser.get('db_config', 'database')
-            return db_congif_dict
+        if len(movie_info) == 21:
+            return movie_info
         else:
-            raise ValueError('Configuration file dose not contain the required information, please check it.')
-    except:
-        print('Parsing database configuration failed.\n', sys.exc_info())
+            raise KeyError('Incorrect number of keys of movie dict!')
+
+
+
 
 
 if __name__ == '__main__':
@@ -322,6 +308,6 @@ if __name__ == '__main__':
     # print('5.', parseJsonMovie('1764796'))
     print('6.movie', parseHTML('1764796'))
     print('6.tv', parseHTML('10748120'))
-    print('7.', parseDBconfig('/home/minzhe/dbincloc/doubanStatistics.db'))
+
 
 
