@@ -40,7 +40,7 @@ from lib import utility
 # print('8.', vars(green_snake))
 # print('9.', green_snake.getMovieInfo())
 
-retrieveHistory(userID=63634081)
+# retrieveHistory(userID=63634081)
 
 ###############    1. connect to database    #################
 db_config = mysqlDouban.parseDBconfig('/home/minzhe/dbincloc/doubanStatistics.db')
@@ -55,16 +55,16 @@ print('--------------------------------------------------')
 print('Prepare to writing {} movies to mysql database.'.format(len(id_list)))
 print('--------------------------------------------------')
 for movie_id in id_list:
-    if cur.ifUpdate(id=movie_id):           # will print check information if this movie should be created
+    if cur.ifUpdate(id=movie_id, cleanTemp=True):           # will print check information if this movie should be created
         movie_obj = Movie(id=movie_id)
         movie_obj.readHTML()
         if movie_obj.infoComplete(verbose=True):
             movie_info = movie_obj.getMovieInfo()
-            cur.InsertUpdate(movie_info)
+            cur.InsertUpdate(movie=movie_info, cleanTemp=True)
         else:
             print('...... Movie {} information not stored!')
             continue
-    utility.sleepAfterRequest()
+        utility.sleepAfterRequest()
 
 ##############     3. close database connection      ###############
 cur.close()

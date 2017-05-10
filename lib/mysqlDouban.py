@@ -8,6 +8,7 @@ from configparser import ConfigParser
 import sys
 import pymysql
 import datetime
+from lib import utility
 from lib.retrievePersonalMovie import catHistoryTempFile
 
 ###############     1. utility function      ###############
@@ -63,13 +64,13 @@ pymysql.connections.Connection.movieCursor = movieCursor
 
 
 ###############     3. write movie info to database      ###############
-def ifUpdate(self, id):
+def ifUpdate(self, id, cleanTemp=False):
     '''
     Check if certain movie if exist in database, if not then write,
     if exist but haven't been updated for a while, then update, otherwise skip
     :param cur: database cursor
     :param id: movie id
-    :param update_date: date when movie was written to database
+    :param cleanTemp: if remove temp file
     :return: status
     '''
     sql = 'SELECT id, update_date FROM `movie_subject` WHERE id = {}'.format(id)
@@ -83,6 +84,8 @@ def ifUpdate(self, id):
         return True
     else:
         print('Movie id {} exist, data is new, do not need to be updated.'.format(id))
+        if cleanTemp == True:
+            utility.rmTemp(category='movie', id=id)
         return False
 
 ### Add method to pymysql.cursors.Cursor class
@@ -120,18 +123,18 @@ def InsertUpdateSQL(movie):
               'update_date) ' \
               'VALUES ({}, \'{}\', {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, \'{}\', \'{}\', {}, {}, \'{}\', \'{}\') ' \
               'ON DUPLICATE KEY UPDATE ' \
-              'rating_ave = {} ' \
-              'rating_count = {} ' \
-              'rating_5 = {} ' \
-              'rating_4 = {} ' \
-              'rating_3 = {} ' \
-              'rating_2 = {} ' \
-              'rating_1 = {} ' \
-              'wish_count = {} ' \
-              'viewed_count = {} ' \
-              'comment_count = {} ' \
-              'review_count = {} ' \
-              'update_date = {}' \
+              'rating_ave = {}, ' \
+              'rating_count = {}, ' \
+              'rating_5 = {}, ' \
+              'rating_4 = {}, ' \
+              'rating_3 = {}, ' \
+              'rating_2 = {}, ' \
+              'rating_1 = {}, ' \
+              'wish_count = {}, ' \
+              'viewed_count = {}, ' \
+              'comment_count = {}, ' \
+              'review_count = {}, ' \
+              'update_date = \'{}\'' \
               .format(  # following insert content
                       movie['id'],
                       movie['title'],
@@ -194,18 +197,18 @@ def InsertUpdateSQL(movie):
               'update_date) ' \
               'VALUES ({}, \'{}\', \'{}\', {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, \'{}\', \'{}\', {}, {}, \'{}\', \'{}\') ' \
               'ON DUPLICATE KEY UPDATE ' \
-              'rating_ave = {} ' \
-              'rating_count = {} ' \
-              'rating_5 = {} ' \
-              'rating_4 = {} ' \
-              'rating_3 = {} ' \
-              'rating_2 = {} ' \
-              'rating_1 = {} ' \
-              'wish_count = {} ' \
-              'viewed_count = {} ' \
-              'comment_count = {} ' \
-              'review_count = {} ' \
-              'update_date = {}' \
+              'rating_ave = {}, ' \
+              'rating_count = {}, ' \
+              'rating_5 = {}, ' \
+              'rating_4 = {}, ' \
+              'rating_3 = {}, ' \
+              'rating_2 = {}, ' \
+              'rating_1 = {}, ' \
+              'wish_count = {}, ' \
+              'viewed_count = {}, ' \
+              'comment_count = {}, ' \
+              'review_count = {}, ' \
+              'update_date = \'{}\'' \
               .format(  # following insert content
                       movie['id'],
                       movie['title'],
@@ -244,16 +247,23 @@ def InsertUpdateSQL(movie):
                       movie['update_date'])
     return sql
 
-def InsertUpdate(self, movie):
+def InsertUpdate(self, movie, cleanTemp=False):
     '''
     Write movie objects data into database.
     :param conn: database connection
     :param movie_list: movie objects to write
+    :param cleanTemp: if remove temp file
     :return: no return
     '''
     print('... Writing movie {} {} to database.'.format(movie['id'], movie['title']))
     sql = InsertUpdateSQL(movie)
-    self.execute(sql)
+    try:
+        self.execute(sql)
+        if cleanTemp:
+            utility.rmTemp(category='movie', id=movie['id'])
+    except:
+        print('Writing to mysql failed! SQL:', sql, sys.exc_info(), sep='\n')
+        sys.exit()
     self.connection.commit()
 
 ### Add method to pymysql.cursors.Cursor class

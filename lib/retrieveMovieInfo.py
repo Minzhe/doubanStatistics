@@ -11,6 +11,7 @@ new_movie = Movie(id=)
 new_movie.readHTML()
     catHTML()
     downloadHTML()
+        catHTMLtempfile()
     parseHTML()
 new_movie.infoComplete(verbose=True)
 info_dict = new_movie.getMovieInfo()
@@ -75,7 +76,7 @@ def downloadHTML(url):
         print('... Retrieving movie html file ...')
         try:
             urlretrieve(url, target_path)
-            print('... success!')
+            print('... Retrieve succeed!')
             return True
         except URLError:
             print('... Fetching {} failed.'.format(url), sys.exc_info())
@@ -98,6 +99,7 @@ def parseHTML(id):
 
             ### <h1>
             title = bsObj.find('span', {'property': 'v:itemreviewed'}).get_text().strip()
+            title = re.sub('\'', '', title)
             if 'Season' in title:           # tv
                 # title
                 movie_info['title'] = re.match('.+第.+季', title).group()
@@ -109,6 +111,9 @@ def parseHTML(id):
                 movie_info['original_title'] = ' '.join(title.split(' ')[1:])
                 if movie_info['original_title'] == '':  # if Chinese movie (no original name)
                     movie_info['original_title'] = 'Null'
+                # elif len(movie_info['original_title'].split(' ')) % 2 == 1:
+                #     movie_info['title'] = movie_info['title'] + ' ' + movie_info['original_title'].split(' ')[0].strip()
+                #     movie_info['original_title'] = ' '.join(movie_info['original_title'].split(' ')[1:])
 
             # year
             year = bsObj.find('span', {'class': 'year'}).get_text().strip('(').strip(')')
@@ -142,9 +147,13 @@ def parseHTML(id):
             bsObj_info = bsObj.find('div', {'id': 'info'})
             # director
             director = bsObj_info.find('a', {'rel': 'v:directedBy'})['href'].strip('/').split('/')[-1]
-            movie_info['director'] = int(director)
+            try:
+                movie_info['director'] = int(director)
+            except:
+                movie_info['director'] = 'Null'
+                print('Warning: movie director id cannot be parsed!')
             # country
-            movie_info['country'] = bsObj_info.find('span', text=re.compile('.*国家.*')).next_sibling.strip()
+            movie_info['country'] = bsObj_info.find('span', text=re.compile('.*国家.*')).next_sibling.strip().split('/')[0].strip()
             # pubdate
             pubdate = bsObj_info.find('span', {'property': 'v:initialReleaseDate'}).get_text()      # find the first
             movie_info['pubdate'] = re.sub('\(.*\)', '', pubdate)

@@ -43,6 +43,26 @@ def checkTempFolder():
         os.makedirs(temp_dir)
     return temp_dir
 
+def rmTemp(category, id):
+    '''
+    Remove temp files
+    :param category: Movie, movie_person or book
+    :param id: movie id, user id or book id
+    :return: no return
+    '''
+    proj_dir = getProjectDir()
+    temp_dir = os.path.join(proj_dir, 'temp')
+    if category == 'movie':
+        tmp_path = os.path.join(temp_dir, 'movie.subject.' + str(id) + '.html')
+    elif category == 'personal_movie':
+        tmp_path = os.path.join(temp_dir, 'movie.' + id + '.viewed.txt')
+    elif category == 'book':
+        tmp_path = os.path.join(temp_dir, 'book.subject.' + id + '.html')
+    else:
+        raise ValueError('category should be "movie", "movie_history" or "book".')
+    if os.path.exists(tmp_path):
+        os.remove(tmp_path)
+
 
 ###############     2. working with api      ###############
 def catAPIurl(category, id):
