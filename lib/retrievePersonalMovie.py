@@ -9,13 +9,27 @@ from urllib.error import HTTPError
 from bs4 import BeautifulSoup
 import time
 import csv
+import numpy as np
+import os
+from lib import utility
 
-
-def concatUrl(userID, startNum):
-    url = 'https://movie.douban.com/people/{}/collect?start={}&sort=time&rating=all&filter=all&mode=grid'.format(str(userID), str(startNum))
+###################  auxiliary function  ####################
+def catUrl(userID, startNum):
+    '''
+    Concatenate user movie history pages
+    :param userID: user id
+    :param startNum: history page number
+    :return: url
+    '''
+    url = 'https://movie.douban.com/people/{}/collect?start={}&sort=time&rating=all&filter=all&mode=list'.format(str(userID), str(startNum))
     return url
 
 def getHTML(url):
+    '''
+    Retrieve html
+    :param url: url
+    :return: bsObj
+    '''
     try:
         request = urlopen(url)
         bsObj = BeautifulSoup(request, 'lxml')
@@ -24,36 +38,81 @@ def getHTML(url):
     return bsObj
 
 def getMovie(html):
+    '''
+    Extract movie list from watched history.
+    :param html: bsObj
+    :return: movie id list
+    '''
     movieList = []
-    nameList = html.find('div', {'class': 'grid-view'}).findAll('em')
-    for name in nameList:
-        movie = name.get_text().split('/')[0].strip()
-        print(movie)
-        time.sleep(0.2)
-        movieList.append(movie)
+    urlList = html.find('ul', {'class': 'list-view'}).findAll('a')
+    for url in urlList:
+        movie_id = url['href'].strip('/').split('/')[-1]
+        utility.relexPrint(url.get_text().strip())
+        movieList.append(movie_id)
     return movieList
 
 
-userID = 63634081
-startNum = 0
-movieList = []
-pageExists = True
+def catHistoryTempFile(userID):
+    '''
+    Concatename temp file to store personal movie history information
+    :param userID: user id
+    :return: temp file name
+    '''
+    tmp_dir = utility.checkTempFolder()
+    tmp_filename = 'movie.' + str(userID) + '.viewed.txt'
+    tmp_path = os.path.join(tmp_dir, tmp_filename)
+    return tmp_path
 
-while pageExists:
-    url = concatUrl(userID=userID, startNum=startNum)
-    bsObj = getHTML(url=url)
-    if bsObj is None:
-        pageExists = False
-    else:
-        print('\nMovie list from #{} to ...\n------------'.format(str(startNum+1)))
-        newMovieList = getMovie(html=bsObj)
-        movieList.append(newMovieList)
-        startNum = startNum + 15
 
-csvPath = 'data/movieHistory.{}.csv'.format(str(userID))
-csvFile = open(csvPath, 'wt')
-writer = csv.writer(csvFile)
-for movie in movieList:
-    writer.writerow(movie)
+##################  main function  ######################
+def getUserMovieHistory(userID):
+    '''
+    Get user movie view history
+    :param userID: user id
+    :return: movie id list
+    '''
+    startNum = 0
+    movieList = []
+    pageExists = True
 
-csvFile.close()
+    print('Retrieving {} movie history'.format(userID))
+    while pageExists:
+        url = catUrl(userID=userID, startNum=startNum)
+        bsObj = getHTML(url=url)
+        if len(movieList) == 0 or len(newMovieList) == 30:      # first page or the page has 30 movies (next page exist)
+            print('\nMovie list from #{} \n-------------'.format(str(startNum + 1)))
+            newMovieList = getMovie(html=bsObj)
+            movieList = movieList + newMovieList
+            startNum = startNum + 30
+        else:
+            pageExists = False
+
+        utility.sleepAfterRequest()         # randomly sometime before next retrieving
+
+    print(movieList)
+    return movieList
+
+def retrieveHistory(userID):
+    '''
+    Retrieve personal movie history, and write to temp file.
+    :param userID: user id
+    :return:
+    '''
+    tmp_path = catHistoryTempFile(userID=userID)
+    movieList = getUserMovieHistory(userID=userID)
+    with open(tmp_path, 'w') as f:
+        for movie in movieList:
+            f.write(movie)
+            f.write('\n')
+
+
+# userID = 63634081
+#
+#
+# csvPath = 'data/movieHistory.{}.csv'.format(str(userID))
+# csvFile = open(csvPath, 'wt')
+# writer = csv.writer(csvFile)
+# for movie in movieList:
+#     writer.writerow(movie)
+#
+# csvFile.close()
