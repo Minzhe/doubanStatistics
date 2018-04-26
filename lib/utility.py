@@ -1,18 +1,18 @@
-###################################################
-###                 utility.py                  ###
-###################################################
+############################################################################
+###                              utility.py                              ###
+############################################################################
 # This python module contains utility functions.
 
 import os
 import sys
-from urllib.request import urlretrieve
-from urllib.request import URLError
 import json
 import time
 import numpy as np
+from urllib.request import urlretrieve
+from urllib.request import URLError
 
 
-###############     0. utility function      ###############
+###########################     0. utility function      ###########################
 def sleepAfterRequest():
     time.sleep(np.random.uniform(5, 20))
 
@@ -20,11 +20,12 @@ def relexPrint(content):
     print(content)
     time.sleep(0.15)
 
-###############     1. working with directory      ###############
+
+########################     1. working with directory      ###########################
 def getProjectDir():
     '''
-    get the top absolute dirname of the project
-    :return: dirname
+    get the top absolute path of this project
+    @return: path
     '''
     file_path = os.path.realpath(__file__)
     end_idx = file_path.find('doubanStatistics')
@@ -35,7 +36,7 @@ def getProjectDir():
 def checkTempFolder():
     '''
     Check if temp folder exist, and create it if not.
-    :return: no return
+    @return: no return
     '''
     proj_dir = getProjectDir()
     temp_dir = os.path.join(proj_dir, 'temp')
@@ -43,12 +44,13 @@ def checkTempFolder():
         os.makedirs(temp_dir)
     return temp_dir
 
+
 def rmTemp(category, id):
     '''
     Remove temp files
-    :param category: Movie, movie_person or book
-    :param id: movie id, user id or book id
-    :return: no return
+    @param category: Movie, movie_person or book
+    @param id: movie id, user id or book id
+    @return: no return
     '''
     proj_dir = getProjectDir()
     temp_dir = os.path.join(proj_dir, 'temp')
@@ -64,13 +66,13 @@ def rmTemp(category, id):
         os.remove(tmp_path)
 
 
-###############     2. working with api      ###############
+###############################     2. working with api      ################################
 def catAPIurl(category, id):
     '''
     Concatenate item api url from its category and id.
-    :param category: movie or book
-    :param id: item id
-    :return: url
+    @param category: movie or book
+    @param id: item id
+    @return: url
     '''
     if category == 'movie':
         return 'https://api.douban.com/v2/movie/subject/' + str(id)
@@ -83,8 +85,8 @@ def catAPIurl(category, id):
 def catAPItempfile(url):
     '''
     Parse api url, subtract identification information to name file for downloading.
-    :param url: api url
-    :return: filename
+    @param url: api url
+    @return: filename
     '''
     url = url.strip('/')
     if '/movie/' in url:      # if movie
@@ -104,8 +106,8 @@ def catAPItempfile(url):
 def APIdownloadJson(url):
     '''
     Download API json file to temp folder.
-    :param url: json url.
-    :return: no return.
+    @param url: json url.
+    @return: no return.
     '''
     temp_dir = checkTempFolder()
     temp_filename = catAPItempfile(url)
@@ -124,8 +126,8 @@ def APIdownloadJson(url):
 def parseJsonMovie(id):
     '''
     Parse api movie information and return from json file.
-    :param id: movie id
-    :return: movie attribute dict
+    @param id: movie id
+    @return: movie attribute dict
     '''
     temp_dir = checkTempFolder()
     temp_path = os.path.join(temp_dir, 'api.movie.subject.' + str(id) + '.json')
