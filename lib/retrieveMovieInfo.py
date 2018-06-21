@@ -5,16 +5,16 @@
 This python script contains the function and class to retrieve and store movie
 subject information from movie.douban.com.
 
-Function hierarchy:
+Function structure:
 ---------------------------------------------------
-new_movie = Movie(id=)                      | initiate movie entry
-new_movie.readHTML()                        | get movie info from html
-    catHTML()                               |
-    downloadHTML()                          |
-        catHTMLtempfile()                   |
-    parseHTML()                             |
-new_movie.infoComplete(verbose=True)        | check if the class attributes is complete
-info_dict = new_movie.getMovieInfo()        | store the movie information to a dictionary
+├── new_movie = Movie(id=)                      | initiate movie entry
+├── new_movie.readHTML()                        | get movie info from html
+│   ├── catHTML()                               |
+│   ├── downloadHTML()                          |
+│   │   └── catHTMLtempfile()                   |
+│   ├── parseHTML()                             |
+├── new_movie.infoComplete(verbose=True)        | check if the class attributes is complete
+└── info_dict = new_movie.getMovieInfo()        | store the movie information to a dictionary
 '''
 
 import os
@@ -24,65 +24,11 @@ import sys
 from urllib.request import urlretrieve
 from urllib.request import URLError
 from bs4 import BeautifulSoup
-import utility
+import utility as u
 from pprint import pprint
 
 
 #####################################  function  ######################################
-def catHTML(category, id):
-    '''
-    Concatenate item url from its category and id.
-    @param category: movie or book
-    @param id: item id
-    @return: url
-    '''
-    if category in ['movie', 'book']:
-        return 'https://' + category + '.douban.com/subject/' + str(id)
-    else:
-        raise ValueError('Cannot parse item url, currently only support movie and book.')
-
-
-def catHTMLtempfile(url):
-    '''
-    Parse html url, subtract identification information to name file for downloading.
-    @param url: api url
-    @return: filename
-    '''
-    url = url.strip('/')
-    if 'movie.douban.com/' in url:      # if movie
-        id = url.split('/')[-1]
-        temp_filename = 'movie.subject.' + id + '.html'
-        return temp_filename
-    elif 'book.douban.com/' in url:     # if book
-        id = url.split('/')[-1]
-        temp_filename = 'book.subject.' + id + '.html'
-        return temp_filename
-    else:
-        raise ValueError('Cannot parse html url, currently only support movie and book.')
-
-
-def downloadHTML(url):
-    '''
-    Download html file to temp folder
-    @param url: movie subject html url
-    @return: status
-    '''
-    temp_dir = utility.checkTempFolder()
-    temp_filename = catHTMLtempfile(url)
-    target_path = os.path.join(temp_dir, temp_filename)
-    if os.path.exists(target_path):
-        print('... Movie html file already exist in temp folder.')
-        return True
-    else:
-        print('... Retrieving movie html file ...')
-        try:
-            urlretrieve(url, target_path)
-            print('... Retrieve succeed!')
-            return True
-        except URLError:
-            print('... Fetching {} failed.'.format(url), sys.exc_info())
-            return False
-
 
 def parseHTML(id):
     '''
@@ -90,7 +36,7 @@ def parseHTML(id):
     @param id: movie id
     @return: movie attribute dict
     '''
-    temp_dir = utility.checkTempFolder()
+    temp_dir = u.checkTempFolder()
     temp_path = os.path.join(temp_dir, 'movie.subject.' + str(id) + '.html')
     if os.path.exists(temp_path):
         with open(temp_path, encoding='utf-8') as html_file:
@@ -260,11 +206,11 @@ class Movie(object):
     #     @return: no return
     #     '''
     #     # download api json file
-    #     api_url = utility.catAPIurl('movie', self.__id)
-    #     status = utility.APIdownloadJson(api_url)
+    #     api_url = u.catAPIurl('movie', self.__id)
+    #     status = u.APIdownloadJson(api_url)
     #     # parse api json file
     #     if status:
-    #         movie_info = utility.parseJsonMovie(self.__id)
+    #         movie_info = u.parseJsonMovie(self.__id)
     #         self.__title = movie_info['title']
     #         self.__original_title = movie_info['original_title']
     #         self.__rating_ave = movie_info['rating_ave']
@@ -284,8 +230,8 @@ class Movie(object):
         @return: noreturn
         '''
         ### download html file
-        html_url = catHTML('movie', self.__id)
-        status = downloadHTML(html_url)
+        html_url = u.catHTML('movie', self.__id)
+        status = u.downloadHTML(html_url)
         ### parse html file
         if status:
             movie_info = parseHTML(self.__id)

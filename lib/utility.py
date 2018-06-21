@@ -1,7 +1,28 @@
 ############################################################################
 ###                              utility.py                              ###
 ############################################################################
-# This python module contains utility functions.
+'''
+This python module contains utility functions.
+
+Function/
+
+0. ##### utility
+├── sleepAfterRequest()
+└── relexPrint()
+1. ##### directory
+├── checkTempFolder()
+│   └── getProjectDir()
+└── rmTemp(category, id)
+2. ##### api
+├── catAPIurl(category, id)
+├── catAPItempfile(url)
+├── APIdownloadJson(url)
+└── parseJsonMovie(id)
+3. ##### get book and movie content
+├── catHTML(category, id)
+└── downloadHTML(url)
+    └── catHTMLtempfile(url)
+'''
 
 import os
 import sys
@@ -151,9 +172,65 @@ def parseJsonMovie(id):
             return movie_info
 
 
+###############################     2. retrieve book and movie      ################################
+def catHTML(category, id):
+    '''
+    Concatenate item url from its category and id.
+    @param category: movie or book
+    @param id: item id
+    @return: url
+    '''
+    if category in ['movie', 'book']:
+        return 'https://' + category + '.douban.com/subject/' + str(id)
+    else:
+        raise ValueError('Cannot parse item url, currently only support movie and book.')
+
+
+def catHTMLtempfile(url):
+    '''
+    Parse html url, subtract identification information to name file for downloading.
+    @param url: api url
+    @return: filename
+    '''
+    url = url.strip('/')
+    if 'movie.douban.com/' in url:      # if movie
+        id = url.split('/')[-1]
+        temp_filename = 'movie.subject.' + id + '.html'
+        return temp_filename
+    elif 'book.douban.com/' in url:     # if book
+        id = url.split('/')[-1]
+        temp_filename = 'book.subject.' + id + '.html'
+        return temp_filename
+    else:
+        raise ValueError('Cannot parse html url, currently only support movie and book.')
+
+
+def downloadHTML(url):
+    '''
+    Download html file to temp folder
+    @param url: movie subject html url
+    @return: status (bool)
+    '''
+    temp_dir = checkTempFolder()
+    temp_filename = catHTMLtempfile(url)
+    target_path = os.path.join(temp_dir, temp_filename)
+    if os.path.exists(target_path):
+        print('... Movie html file already exist in temp folder.')
+        return True
+    else:
+        print('... Retrieving movie html file ...')
+        try:
+            urlretrieve(url, target_path)
+            print('... Retrieve succeed!')
+            return True
+        except URLError:
+            print('... Fetching {} failed.'.format(url), sys.exc_info())
+            return False
+
+
 
 if __name__ == '__main__':
-    print('This script.')
+    print('This script contains utility function.\nimport utility')
 
 
 
