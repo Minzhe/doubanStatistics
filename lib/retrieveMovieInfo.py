@@ -6,15 +6,14 @@ This python script contains the function and class to retrieve and store movie
 subject information from movie.douban.com.
 
 Function structure:
----------------------------------------------------
-├── new_movie = Movie(id=)                      | initiate movie entry
-├── new_movie.readHTML()                        | get movie info from html
-│   ├── catHTML()                               |
-│   ├── downloadHTML()                          |
-│   │   └── catHTMLtempfile()                   |
-│   ├── parseHTML()                             |
-├── new_movie.infoComplete(verbose=True)        | check if the class attributes is complete
-└── info_dict = new_movie.getMovieInfo()        | store the movie information to a dictionary
+Movie()
+├── __init__(self, id)                          | create instance
+├── readAPI(self)                               | get movie information from douban api
+├── readHTML(self)                              | get movie information from html file
+│   └── parseHTML(id)                           | parse movie html content
+├── infoComplete(self, verbose, cleanTemp)      | check if movie information is complete
+├── getid(self)                                 | return movie id
+└── getMovieInfo(self)                          | return movie informaiton
 '''
 
 import os
@@ -24,18 +23,17 @@ import sys
 from urllib.request import urlretrieve
 from urllib.request import URLError
 from bs4 import BeautifulSoup
-import utility as u
+from . import utility as u
 from pprint import pprint
 
 
-#####################################  function  ######################################
-
+##################################  function  ###################################
 def parseHTML(id):
-    '''
+    """
     This is the core function to parse website movie information from html file and return
     @param id: movie id
     @return: movie attribute dict
-    '''
+    """
     temp_dir = u.checkTempFolder()
     temp_path = os.path.join(temp_dir, 'movie.subject.' + str(id) + '.html')
     if os.path.exists(temp_path):
@@ -89,7 +87,6 @@ def parseHTML(id):
             else:
                 raise ValueError('Cannot figure out item type (movie or tv), check original website of movie {}.'.format(id))
 
-
             ### ------------------ content in <div id="info"> ---------------------- ###
             bsObj_info = bsObj.find('div', {'id': 'info'})
             ### director
@@ -102,18 +99,27 @@ def parseHTML(id):
             ### country
             movie_info['country'] = bsObj_info.find('span', text=re.compile('.*国家.*')).next_sibling.strip().split('/')[0].strip()
             ### pubdate
-            pubdate = bsObj_info.find('span', {'property': 'v:initialReleaseDate'}).get_text()      # find the first
-            movie_info['pubdate'] = re.sub('\(.*\)', '', pubdate)
+            pubdate = [date_.get_text() for date_ in bsObj_info.findAll('span', {'property': 'v:initialReleaseDate'})]
+            pubdate = list(map(lambda x: re.sub('\(.*\)', '', x), pubdate))
+            if len(pubdate) == 1:
+                movie_info['pubdate'] = pubdate[0]
+            else:
+                try:
+                    movie_info['pubdate'] = [date_ for date_ in pubdate if str(movie_info['year']) in date_][0]
+                except:
+                    movie_info['pubdate'] = sorted(pubdate)[0]
+            movie_info['pubdate'] = u.cleanDate(movie_info['pubdate'])
             ### duration
             if movie_info['subtype'] == 'movie':
-                duration = bsObj_info.find('span', {'property': 'v:runtime'}).get_text().split(' ')[0].strip('分钟')
+                duration = bsObj_info.find('span', {'property': 'v:runtime'}).get_text().strip()
+                duration = re.findall('([0-9]+)\s*分钟', duration)[0]
                 movie_info['episode'] = 'Null'
             elif movie_info['subtype'] == 'tv':
-                duration = bsObj_info.find('span', text=re.compile('.*单集片长.*')).next_sibling.strip().strip('分钟')
+                duration = bsObj_info.find('span', text=re.compile('.*单集片长.*')).next_sibling.strip()
+                duration = re.findall('([0-9]+)\s*分钟', duration)[0]
                 episode = bsObj_info.find('span', text=re.compile('.*集数.*')).next_sibling.strip()
                 movie_info['episode'] = int(episode)
             movie_info['duration'] = int(duration)
-
 
             ### ---------------------- content in <div class="rating_self clearfix"> ---------------------- ###
             ### rating_ave
@@ -136,10 +142,19 @@ def parseHTML(id):
             comment_count = bsObj.find('div', {'id': 'comments-section'}).h2.span.a.get_text().split(' ')[1]
             movie_info['comment_count'] = int(comment_count)
 
-            ### content in <section class="reviews mod movie-content">
+            ### ----------------------- content in <section class="reviews mod movie-content"> ---------- ###
             # review_count
             review_count = bsObj.find('section', {'class': 'reviews mod movie-content'}).header.h2.span.a.get_text().split(' ')[1]
             movie_info['review_count'] = int(review_count)
+
+            ### -------------------------- content in <span class="all hidden"> ------------------------- ###
+            movie_intro = bsObj.find('span', {'class': 'all hidden'})
+            if movie_intro is not None:
+                movie_info['intro'] = ''.join(list(map(lambda x: x.strip(), movie_intro.get_text().strip().split('\n'))))
+            else:
+                movie_intro = bsObj.find('span', {'property': 'v:summary'})
+                if movie_intro is not None:
+                    movie_info['intro'] = ''.join(list(map(lambda x: x.strip(), movie_intro.get_text().strip().split('\n'))))
 
         ### set updated date
         temp_file_mtime = os.path.getmtime(temp_path)
@@ -150,26 +165,17 @@ def parseHTML(id):
             movie_info['subtype'] = 1
         elif movie_info['subtype'] == 'tv':
             movie_info['subtype'] = 2
-        if len(movie_info) == 21:
+        if len(movie_info) == 22:
             print('... Movie {} information parsed.'.format(id))
             return movie_info
         else:
             raise KeyError('Incorrect number of keys of movie dict!')
-    
     else:
         raise ValueError('Cannot find the html file {}.'.format(temp_path))
 
 
 ##################################  movie class  ###################################
 class Movie(object):
-    '''
-    @func __init__: create instance
-    @func readAPI: get movie information from douban api
-    @func read HTML: get movie information from html file
-    @func infoComplete: check if movie information is complete
-    @func getid: return movie id
-    @func getMovieInfo: return movie informaiton
-    '''
 
     def __init__(self, id):
         '''
@@ -197,6 +203,7 @@ class Movie(object):
         self.__duration = None                  # duration of the movie
         self.__episode = None                   # which episode (only applied when item is a tv series, null for movie)
         self.__country = None                   # country the movie released
+        self.__intro = None                     # movie introduction
         self.__update_date = None               # when is this information is updated
 
     # Because the pubilc api only return limited information, currently the function download the whole webpage
@@ -255,7 +262,11 @@ class Movie(object):
             self.__duration = movie_info['duration']
             self.__episode = movie_info['episode']
             self.__country = movie_info['country']
+            self.__intro = movie_info['intro']
             self.__update_date = movie_info['update_date']
+        else:
+            raise URLError('Fetching {} failed.'.format(html_url))
+
 
 
     def infoComplete(self, verbose=False, cleanTemp=False):
@@ -323,13 +334,15 @@ class Movie(object):
                           ('duration', self.__duration),
                           ('episode', self.__episode),
                           ('country', self.__country),
+                          ('intro', self.__intro),
                           ('update_date', self.__update_date)])
         return movie_dict
 
 
 if __name__ == '__main__':
     print('Following is the result to test if this script works\n' + '-'*50)
-    test_movie = Movie(id=1764796)
+    # test_movie = Movie(id=1764796)
+    test_movie = Movie(id=26416062)
     test_movie.readHTML()
     test_movie.infoComplete(verbose=True, cleanTemp=False)
-    pprint(test_movie.getMovieInfo())
+    print(test_movie.getMovieInfo())

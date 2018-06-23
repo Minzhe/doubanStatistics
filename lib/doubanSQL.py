@@ -1,14 +1,30 @@
-###################################################
-###                connectDB.py                 ###
-###################################################
-# This python script is to write information into mysql database.
+################################################################
+###                        doubanSQL.py                      ###
+################################################################
+'''
+This python script is to write information into mysql database.
 
+1. ##### utility
+└── parseDBconfig(config_file)
+2. ##### connect to databse
+└── doubanCursor(self)                  pymysql.connections.Connection.doubanCursor
+    └── connect(host, user, passwd, db)
+3. ##### write to databse
+├── ifUpdate(self, id, cleanTemp=False, force=False)        pymysql.cursors.Cursor.ifUpdate
+├── InsertUpdateMovie(self, movie, cleanTemp=False)         pymysql.cursors.Cursor.InsertUpdateMovie
+    ├── 
+    └── InsertUpdateMovieSQL(movie)
+4. ##### search database information
+├── getIdList(subject)
+
+'''
 
 from configparser import ConfigParser
 import sys
+import re
 import pymysql
 import datetime
-from lib import utility
+from lib import utility as u
 from lib.retrievePersonalMovie import catHistoryTempFile
 
 ###############     1. utility function      ###############
@@ -34,19 +50,6 @@ def parseDBconfig(config_file):
         print('Parsing database configuration failed.\n', sys.exc_info())
 
 
-def getPersonlMovie(userID):
-    '''
-    Parse personal movie history movie information temp file, get all viewed movie id.
-    :param userID: userID
-    :return: movie id list
-    '''
-    tmp_path = catHistoryTempFile(userID=userID)
-    with open(tmp_path, 'r') as f:
-        id_list = f.readlines()
-    id_list = [int(movie_id.strip()) for movie_id in id_list]
-
-    return id_list
-
 
 ###############     2. connect to database      ###############
 def connect(host, user, passwd, db):
@@ -54,44 +57,47 @@ def connect(host, user, passwd, db):
     return conn
 
 
-def movieCursor(self):
+def doubanCursor(self):
     cur = self.cursor(pymysql.cursors.DictCursor)
     cur.execute('USE doubanStatistics')
     return cur
 
 ### Add method to pymysql.connections.Connection class
-pymysql.connections.Connection.movieCursor = movieCursor
+pymysql.connections.Connection.doubanCursor = doubanCursor
 
 
 ###############     3. write movie info to database      ###############
-def ifUpdate(self, id, cleanTemp=False):
+def ifUpdate(self, id, cleanTemp=False, force=False):
     '''
     Check if certain movie if exist in database, if not then write,
     if exist but haven't been updated for a while, then update, otherwise skip
-    :param cur: database cursor
-    :param id: movie id
-    :param cleanTemp: if remove temp file
-    :return: status
+    @param cur: database cursor
+    @param id: movie id
+    @param cleanTemp: if remove temp file
+    @return: status
     '''
-    sql = 'SELECT id, update_date FROM `movie_subject` WHERE id = {}'.format(id)
-    self.execute(sql)
-    data = self.fetchone()
-    if data is None:
-        print('Movie id {} does not exist, need to be stored.'.format(id))
-        return True
-    elif datetime.date.today() - data['update_date'] > datetime.timedelta(90):
-        print('Movie id {} exist, but data is old, need to be updated.'.format(id))
+    if force:
         return True
     else:
-        print('Movie id {} exist, data is new, do not need to be updated.'.format(id))
-        if cleanTemp == True:
-            utility.rmTemp(category='movie', id=id)
-        return False
+        sql = 'SELECT id, update_date FROM `movie_subject` WHERE id = {}'.format(id)
+        self.execute(sql)
+        data = self.fetchone()
+        if data is None:
+            print('Movie id {} does not exist in database, need to be updated.'.format(id))
+            return True
+        elif datetime.date.today() - data['update_date'] > datetime.timedelta(90):
+            print('Movie id {} exist, but data is outdated, need to be updated.'.format(id))
+            return True
+        else:
+            print('Movie id {} exist, data is new, do not need to be updated.'.format(id))
+            if cleanTemp == True:
+                u.rmTemp(category='movie', id=id)
+            return False
 
 ### Add method to pymysql.cursors.Cursor class
 pymysql.cursors.Cursor.ifUpdate = ifUpdate
 
-def InsertUpdateSQL(movie):
+def InsertUpdateMovieSQL(movie):
     '''
     Prepare sql for writting movie information to MySQL database.
     :param movie: Dict contain movie information
@@ -120,8 +126,9 @@ def InsertUpdateSQL(movie):
               'duration, ' \
               'episode, ' \
               'country, ' \
+              'intro, ' \
               'update_date) ' \
-              'VALUES ({}, \'{}\', {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, \'{}\', \'{}\', {}, {}, \'{}\', \'{}\') ' \
+              'VALUES ({}, \'{}\', {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, \'{}\', \'{}\', {}, {}, \'{}\', \'{}\', \'{}\') ' \
               'ON DUPLICATE KEY UPDATE ' \
               'rating_ave = {}, ' \
               'rating_count = {}, ' \
@@ -157,6 +164,7 @@ def InsertUpdateSQL(movie):
                       movie['duration'],
                       movie['episode'],
                       movie['country'],
+                      movie['intro'],
                       movie['update_date'],
                         # following update content
                       movie['rating_ave'],
@@ -194,8 +202,9 @@ def InsertUpdateSQL(movie):
               'duration, ' \
               'episode, ' \
               'country, ' \
+              'intro, ' \
               'update_date) ' \
-              'VALUES ({}, \'{}\', \'{}\', {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, \'{}\', \'{}\', {}, {}, \'{}\', \'{}\') ' \
+              'VALUES ({}, \'{}\', \'{}\', {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, \'{}\', \'{}\', {}, {}, \'{}\', \'{}\', \'{}\') ' \
               'ON DUPLICATE KEY UPDATE ' \
               'rating_ave = {}, ' \
               'rating_count = {}, ' \
@@ -231,6 +240,7 @@ def InsertUpdateSQL(movie):
                       movie['duration'],
                       movie['episode'],
                       movie['country'],
+                      movie['intro'],
                       movie['update_date'],
                         # following update content
                       movie['rating_ave'],
@@ -247,30 +257,50 @@ def InsertUpdateSQL(movie):
                       movie['update_date'])
     return sql
 
-def InsertUpdate(self, movie, cleanTemp=False):
+
+def InsertUpdateMovie(self, movie, cleanTemp=False):
     '''
     Write movie objects data into database.
-    :param conn: database connection
-    :param movie_list: movie objects to write
-    :param cleanTemp: if remove temp file
-    :return: no return
+    @param self: doubanCursor()
+    @param movie: movie dict
+    @param cleanTemp: if remove temp file
+    @return: no return
     '''
     print('... Writing movie {} {} to database.'.format(movie['id'], movie['title']))
-    sql = InsertUpdateSQL(movie)
+    movie['intro'] = u.cleanSQL(movie['intro'])
+    sql = InsertUpdateMovieSQL(movie)
     try:
         self.execute(sql)
         if cleanTemp:
-            utility.rmTemp(category='movie', id=movie['id'])
+            u.rmTemp(category='movie', id=movie['id'])
     except:
         print('Writing to mysql failed! SQL:', sql, sys.exc_info(), sep='\n')
         sys.exit()
     self.connection.commit()
 
 ### Add method to pymysql.cursors.Cursor class
-pymysql.cursors.Cursor.InsertUpdate = InsertUpdate
+pymysql.cursors.Cursor.InsertUpdateMovie = InsertUpdateMovie
 
 
+###############     3. write movie info to database      ###############s
+def getIdList(self, subject):
+    '''
+    Function to get all subject ids:
+    @subject: movie or book
+    @return: id list
+    '''
+    if subject == 'movie':
+        sql = 'SELECT id from `movie_subject`'
+    elif subject == 'book':
+        sql = 'SELECT id from `book_subject`'
+    else:
+        raise ValueError('Incorrect subject type, support book or movie.')
+    self.execute(sql)
+    data = self.fetchall()
+    return list(map(lambda x: x['id'], data))
 
+### Add method to pymysql.cursors.Cursor class
+pymysql.cursors.Cursor.getIdList = getIdList
 
 if __name__ == '__main__':
     print('This script.')

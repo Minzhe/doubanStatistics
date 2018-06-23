@@ -9,10 +9,12 @@ Function/
 0. ##### utility
 ├── sleepAfterRequest()
 └── relexPrint()
-1. ##### directory
+1. ##### directory and file
 ├── checkTempFolder()
 │   └── getProjectDir()
-└── rmTemp(category, id)
+├── rmTemp(category, id)
+├── getIdList(file)
+└── outputIdList(id_list, file)
 2. ##### api
 ├── catAPIurl(category, id)
 ├── catAPItempfile(url)
@@ -22,10 +24,14 @@ Function/
 ├── catHTML(category, id)
 └── downloadHTML(url)
     └── catHTMLtempfile(url)
+4. ##### work with text
+├── cleanSQL(text)
+└── cleanDate(pubdate)
 '''
 
 import os
 import sys
+import re
 import json
 import time
 import numpy as np
@@ -85,6 +91,28 @@ def rmTemp(category, id):
         raise ValueError('category should be "movie", "movie_history" or "book".')
     if os.path.exists(tmp_path):
         os.remove(tmp_path)
+
+def getIdList(file):
+    '''
+    Get movie id list from txt file.
+    @file: txt file
+    @return: list of ids 
+    '''
+    with open(file, 'r') as f:
+        id_list = f.readlines()
+    id_list = [int(movie_id.strip()) for movie_id in id_list]
+    return id_list
+
+def outputIdList(id_list, file):
+    '''
+    Output movie id list to txt file.
+    @id_list: movie id list
+    @file: txt file
+    @return: no return
+    '''
+    with open(file, 'r') as f:
+        for id_ in id_list:
+            print(id_, file=f)
 
 
 ###############################     2. working with api      ################################
@@ -172,7 +200,7 @@ def parseJsonMovie(id):
             return movie_info
 
 
-###############################     2. retrieve book and movie      ################################
+###############################     3. retrieve book and movie      ################################
 def catHTML(category, id):
     '''
     Concatenate item url from its category and id.
@@ -224,10 +252,35 @@ def downloadHTML(url):
             print('... Retrieve succeed!')
             return True
         except URLError:
-            print('... Fetching {} failed.'.format(url), sys.exc_info())
+            print('... Fetching {} failed.'.format(url))
             return False
 
 
+
+###############################     4. clean text information      ################################
+def cleanSQL(text):
+    '''
+    Clean apostrophe in sql sentense to prevent error
+    @text: text to insert into database
+    @return: cleaned text
+    '''
+    return re.sub('\'', '\'\'', text)
+
+def cleanDate(pubdate):
+    '''
+    Reformate pubdate to xxxx-xx-xx
+    @pubdate: date
+    @return: reformated date
+    '''
+    n_ = re.findall('-', pubdate)
+    if len(n_) == 2:
+        return pubdate
+    elif len(n_) == 1:
+        return pubdate + '-01'
+    elif len(n_) == 0:
+        return pubdate + '-01-01'
+    else:
+        raise ValueError('pubdate formate error!')
 
 if __name__ == '__main__':
     print('This script contains utility function.\nimport utility')

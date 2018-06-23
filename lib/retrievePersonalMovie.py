@@ -106,6 +106,19 @@ def retrieveHistory(userID):
             f.write('\n')
 
 
+def getPersonlMovie(userID):
+    '''
+    Parse personal movie history movie information temp file, get all viewed movie id.
+    :param userID: userID
+    :return: movie id list
+    '''
+    tmp_path = catHistoryTempFile(userID=userID)
+    with open(tmp_path, 'r') as f:
+        id_list = f.readlines()
+    id_list = [int(movie_id.strip()) for movie_id in id_list]
+
+    return id_list
+
 # userID = 63634081
 #
 #

@@ -3,68 +3,59 @@
 #################################################################
 # This python script is to retrieve movie information.
 
+'''
+Function structure:
+---------------------------------------------------
+├── new_movie = Movie(id=)                      | initiate movie entry
+├── new_movie.readHTML()                        | get movie info from html
+│   ├── catHTML()                               |
+│   ├── downloadHTML()                          |
+│   │   └── catHTMLtempfile()                   |
+│   ├── parseHTML()                             |
+├── new_movie.infoComplete(verbose=True)        | check if the class attributes is complete
+└── info_dict = new_movie.getMovieInfo()        | store the movie information to a dictionary
+'''
+
 import sys
 from os.path import join, dirname, abspath
 sys.path.append(join(dirname(abspath(__file__)), '..'))
+from urllib.request import URLError
 from lib.retrieveMovieInfo import Movie
 from lib.retrievePersonalMovie import retrieveHistory
-from lib import mysqlDouban
-from lib import utility
+from lib import doubanSQL
+from lib import utility as u
 
-
-# robots_9 = Movie(1764796)
-# print('1.', robots_9.getid())
-# print('2.', robots_9.infoComplete(verbose=True))
-# print('3.', robots_9.__getattribute__('_Movie__year'))
-# print('4.', robots_9.__dict__)
-# print('5.')
-# robots_9.readHTML()
-# print('6.', vars(robots_9))
-# print('7.', robots_9.infoComplete(verbose=True))
-# print('\n')
-#
-# detective = Movie(10748120)
-# print('1.', detective.getid())
-# print('5.')
-# detective.readHTML()
-# print('6.', vars(detective))
-# print('7.', detective.infoComplete(verbose=True))
-# print('\n')
-#
-# green_snake = Movie(1303394)
-# print('1.', green_snake.getid())
-# print('5.')
-# green_snake.readHTML()
-# print('6.', vars(green_snake))
-# print('7.', green_snake.infoComplete(verbose=True))
-# print('8.', vars(green_snake))
-# print('9.', green_snake.getMovieInfo())
-
-# retrieveHistory(userID=63634081)
 
 ###############    1. connect to database    #################
-db_config = mysqlDouban.parseDBconfig('/home/minzhe/dbincloc/doubanStatistics.db')
-print('1.', db_config)
-conn = mysqlDouban.connect(host=db_config['host'], user=db_config['username'], passwd=db_config['passwd'], db=db_config['db'])
-cur = conn.movieCursor()
+db_config = doubanSQL.parseDBconfig('/home/minzhe/dbincloc/doubanStatistics.ini')
+conn = doubanSQL.connect(host=db_config['host'], user=db_config['username'], passwd=db_config['passwd'], db=db_config['db'])
+cur = conn.doubanCursor()
 
 
 ##############     2. write movie to mysql      ###############
-id_list = mysqlDouban.getPersonlMovie(userID='luorumo')
+# all movie ids
+id_list = u.getIdList('../data/movie_ids.txt')
+id_exists = cur.getIdList(subject='movie')
+id_list = [id_ for id_ in id_list if id_ not in id_exists]
+id_invalid = list()
 print('--------------------------------------------------')
 print('Prepare to writing {} movies to mysql database.'.format(len(id_list)))
 print('--------------------------------------------------')
 for movie_id in id_list:
     if cur.ifUpdate(id=movie_id, cleanTemp=True):           # will print check information if this movie should be created
         movie_obj = Movie(id=movie_id)
-        movie_obj.readHTML()
+        try:
+            movie_obj.readHTML()
+        except:
+            pass
         if movie_obj.infoComplete(verbose=True):
             movie_info = movie_obj.getMovieInfo()
-            cur.InsertUpdate(movie=movie_info, cleanTemp=True)
+            cur.InsertUpdateMovie(movie=movie_info, cleanTemp=True)
         else:
-            print('...... Movie {} information not stored!')
+            print('...... Movie {} information not stored!'.format(movie_id))
+            id_invalid.append(movie_id)
             continue
-        utility.sleepAfterRequest()
+        u.sleepAfterRequest()
 
 ##############     3. close database connection      ###############
 cur.close()
