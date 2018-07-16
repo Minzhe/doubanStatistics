@@ -41,7 +41,7 @@ from urllib.request import URLError
 
 ###########################     0. utility function      ###########################
 def sleepAfterRequest():
-    time.sleep(np.random.uniform(5, 20))
+    time.sleep(np.random.uniform(10, 60))
 
 def relexPrint(content):
     print(content)
@@ -110,7 +110,7 @@ def outputIdList(id_list, file):
     @file: txt file
     @return: no return
     '''
-    with open(file, 'r') as f:
+    with open(file, 'w') as f:
         for id_ in id_list:
             print(id_, file=f)
 

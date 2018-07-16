@@ -36,8 +36,8 @@ cur = conn.doubanCursor()
 # all movie ids
 id_list = u.getIdList('../data/movie_ids.txt')
 id_exists = cur.getIdList(subject='movie')
-id_list = [id_ for id_ in id_list if id_ not in id_exists]
-id_invalid = list()
+id_invalid = u.getIdList('../data/movie_ids_invalid.txt')
+id_list = [id_ for id_ in id_list if id_ not in id_exists and id_ not in id_invalid]
 print('--------------------------------------------------')
 print('Prepare to writing {} movies to mysql database.'.format(len(id_list)))
 print('--------------------------------------------------')
@@ -54,6 +54,7 @@ for movie_id in id_list:
         else:
             print('...... Movie {} information not stored!'.format(movie_id))
             id_invalid.append(movie_id)
+            u.outputIdList(id_invalid, '../data/movie_ids_invalid.txt')
             continue
         u.sleepAfterRequest()
 
